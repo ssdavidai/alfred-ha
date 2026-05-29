@@ -12,6 +12,7 @@ This integration is part of the plan in [`ssdavidai/alfred#111`](https://github.
 |---|---|---|
 | HACS-installable skeleton | shipping in v0.1 | this repo (PR #1) |
 | Non-streaming conversation turn → Alfred | shipping in v0.1 | this repo (PR #1) |
+| **Supervisor bridge (LLAT → Supervisor REST)** | **shipping in v1.1** | this repo (PR #2) |
 | HA tool partitioning (`HassTurnOn`, `HassClimate`, …) | not yet | `ssdavidai/alfred#111` PR3 |
 | Curated MCP catalog per HA turn | not yet | `ssdavidai/alfred#111` PR4 |
 | Voice-context primer + room enrichment | not yet | `ssdavidai/alfred#111` PR5 |
@@ -52,6 +53,134 @@ Each HA turn is a single non-streaming HTTPS POST from the integration to `https
 ## Voice
 
 Voice (STT + TTS + satellite glue) ships as a separate integration once that lands — see **`ssdavidai/alfred-ha-voice`** (not yet created). v0.1 of this integration handles typed Assist only; once the voice integration arrives, Alfred answers voice turns automatically because HA's pipeline picks the conversation agent for both surfaces.
+
+## Supervisor bridge — call Supervisor via LLAT
+
+Home Assistant's long-lived access tokens (LLATs) don't grant Supervisor scope — there's no way to mint an "addon API key" from inside HA. That blocks any external operator (Alfred, ad-hoc scripts) from driving addon configs, writing to `/share/`, or fetching host info without falling back to SSH or addon credentials.
+
+Since **v1.1.0**, this integration declares `"hassio"` as a dependency, which makes HA auto-inject a Supervisor token into the integration's environment. We then re-publish a small surface of Supervisor REST as HA services (`alfred.supervisor_*`), callable via the standard `POST /api/services/<domain>/<service>` route with any LLAT.
+
+**The result: any LLAT-bearing caller gets Supervisor scope through Alfred.** HA-side auth (the LLAT) gates *who*; the bridge gates *what* (`/share/...`, addon REST, host info, OS info).
+
+### Services
+
+| Service | Args | Result |
+|---|---|---|
+| `alfred.supervisor_call` | `{method, path, json_body?}` | `{status, body}` — generic passthrough |
+| `alfred.supervisor_addon_info` | `{slug}` | `{status, body}` (addon config + options + state) |
+| `alfred.supervisor_addon_options_update` | `{slug, options, restart?}` | `{status, body}` or `{options, restart}` |
+| `alfred.supervisor_host_info` | — | `{status, body}` |
+| `alfred.supervisor_os_info` | — | `{status, body}` |
+| `alfred.supervisor_share_write` | `{path, content_base64, create_parents?}` | `{ok, path, bytes_written}` |
+| `alfred.supervisor_share_read` | `{path}` | `{ok, path, size, content_base64}` |
+| `alfred.supervisor_share_list` | `{path}` | `{ok, path, entries[]}` |
+| `alfred.supervisor_share_delete` | `{path}` | `{ok, path}` |
+
+All services support **`return_response=true`** — call them with `?return_response=true` (or the JSON-API `"return_response": true` field) to receive the response envelope back.
+
+Error envelopes (`{error, ...}`) cover:
+
+- `supervisor_unavailable` — running on HA Container / Core venv (no Supervisor); `installation_type` and `hint` accompany.
+- `unsafe_path` — `/share/`-only paths; rejects `..` traversal, absolute escapes, and symlinks pointing outside `/share/`. `reason` is one of `traversal`, `outside_share_root`, `symlink_escape`, etc.
+- `too_large` — write/read exceeds the 10MB cap.
+- `bad_base64` — payload couldn't be decoded.
+- `not_found` / `not_a_file` / `not_a_directory` / `is_a_directory` — filesystem-state mismatches.
+
+### Examples
+
+#### Upload an OpenWakeWord model from outside HA (bash)
+
+```bash
+HA=https://ha.example.com
+LLAT=eyJhbGciOi…           # your long-lived access token
+
+curl -sS -X POST \
+  -H "Authorization: Bearer $LLAT" \
+  -H "Content-Type: application/json" \
+  "$HA/api/services/alfred/supervisor_share_write?return_response=true" \
+  -d "$(jq -n \
+        --arg path "/share/openwakeword/alfred.tflite" \
+        --arg b64 "$(base64 -w0 < alfred.tflite)" \
+        '{path: $path, content_base64: $b64}')"
+```
+
+Response:
+
+```json
+{
+  "service_response": {
+    "ok": true,
+    "path": "/share/openwakeword/alfred.tflite",
+    "bytes_written": 1048576
+  }
+}
+```
+
+#### Read addon config (python)
+
+```python
+import requests
+
+HA = "https://ha.example.com"
+LLAT = "eyJhbGciOi…"
+
+resp = requests.post(
+    f"{HA}/api/services/alfred/supervisor_addon_info",
+    headers={"Authorization": f"Bearer {LLAT}"},
+    params={"return_response": "true"},
+    json={"slug": "core_openwakeword"},
+)
+print(resp.json()["service_response"]["body"])
+```
+
+#### Update addon options and restart (python)
+
+```python
+resp = requests.post(
+    f"{HA}/api/services/alfred/supervisor_addon_options_update",
+    headers={"Authorization": f"Bearer {LLAT}"},
+    params={"return_response": "true"},
+    json={
+        "slug": "core_openwakeword",
+        "options": {"models": ["alfred"]},
+        "restart": True,
+    },
+)
+```
+
+#### Generic Supervisor REST passthrough (bash)
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $LLAT" \
+  -H "Content-Type: application/json" \
+  "$HA/api/services/alfred/supervisor_call?return_response=true" \
+  -d '{"method": "GET", "path": "/supervisor/info"}'
+```
+
+### Security
+
+These services run with **Supervisor scope** — they can read every addon config and write any file under `/share/`. The only gate between the network and Supervisor is HA's normal LLAT auth.
+
+**Guard your LLAT accordingly.** Treat the LLAT used to call this bridge the same way you'd treat root SSH access:
+
+- Mint a dedicated LLAT for each external caller (Alfred, scripts) so you can revoke per-caller. HA's *Profile → Long-Lived Access Tokens* shows the list.
+- Don't paste the LLAT into pastebins, Discord, or AI chat windows.
+- The bridge does **not** open `/share/` recursively for directory deletion (`supervisor_share_delete` rejects directories) — if you genuinely want recursive removal, use `supervisor_call` to drive whatever surface you prefer. We chose to make that an explicit two-step so a future Alfred regression can't wipe a tenant's wake-word library.
+
+### Where it doesn't work
+
+The bridge requires **HA OS** or **HA Supervised** (the installation types that ship Supervisor). On **HA Container** or **HA Core (venv)**, the services are still registered, but every call returns:
+
+```json
+{
+  "error": "supervisor_unavailable",
+  "installation_type": "container_or_core",
+  "hint": "Alfred's Supervisor bridge requires HA OS or HA Supervised…"
+}
+```
+
+That lets the caller branch on installation type instead of interpreting a generic 5xx.
 
 ## Issues
 

@@ -27,12 +27,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate manifest.json + hacs.json + strings.json
+      - name: Install pyyaml
+        run: pip install pyyaml
+      - name: Validate manifest.json + hacs.json + strings.json + services.yaml
         run: |
           python -m json.tool custom_components/alfred/manifest.json > /dev/null
           python -m json.tool custom_components/alfred/strings.json > /dev/null
           python -m json.tool custom_components/alfred/translations/en.json > /dev/null
           python -m json.tool hacs.json > /dev/null
+          python -c "import yaml; yaml.safe_load(open('custom_components/alfred/services.yaml'))"
 
   hassfest:
     runs-on: ubuntu-latest
