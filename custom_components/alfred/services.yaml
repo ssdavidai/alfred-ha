@@ -1,0 +1,135 @@
+# HA Services metadata for the Alfred Supervisor bridge.
+#
+# Each entry here is what Developer Tools → Services renders. Everything
+# is callable via `POST /api/services/alfred/<name>` with an LLAT, which
+# is the intended Alfred surface — the UI fields are a bonus for humans.
+
+supervisor_call:
+  name: "Supervisor — generic call"
+  description: >
+    Generic Supervisor REST passthrough. The escape hatch for any
+    endpoint we don't ship a dedicated service for. Returns `{status,
+    body}`.
+  fields:
+    method:
+      name: HTTP method
+      required: true
+      example: "GET"
+      selector:
+        select:
+          options: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    path:
+      name: Supervisor path
+      required: true
+      example: "/addons/core_openwakeword/info"
+      selector:
+        text:
+    json_body:
+      name: JSON body
+      required: false
+      selector:
+        object:
+
+supervisor_addon_info:
+  name: "Supervisor — addon info"
+  description: GET /addons/<slug>/info — current config, options, state.
+  fields:
+    slug:
+      name: Addon slug
+      required: true
+      example: "core_openwakeword"
+      selector:
+        text:
+
+supervisor_addon_options_update:
+  name: "Supervisor — addon options update"
+  description: >
+    POST /addons/<slug>/options. If `restart: true`, also POST
+    /addons/<slug>/restart so the new options take effect.
+  fields:
+    slug:
+      name: Addon slug
+      required: true
+      example: "core_openwakeword"
+      selector:
+        text:
+    options:
+      name: Options
+      required: true
+      selector:
+        object:
+    restart:
+      name: Restart addon after update
+      required: false
+      default: false
+      selector:
+        boolean:
+
+supervisor_host_info:
+  name: "Supervisor — host info"
+  description: GET /host/info — OS, hostname, hardware.
+
+supervisor_os_info:
+  name: "Supervisor — OS info"
+  description: GET /os/info — HAOS version, boot slot.
+
+supervisor_share_write:
+  name: "Supervisor — share write"
+  description: >
+    Write a base64-encoded blob to /share/<path>. Cap is 10MB; path is
+    validated to stay under /share/. Used for wake-word uploads,
+    Wyoming model swaps, etc.
+  fields:
+    path:
+      name: Path under /share
+      required: true
+      example: "/share/openwakeword/alfred.tflite"
+      selector:
+        text:
+    content_base64:
+      name: Content (base64)
+      required: true
+      selector:
+        text:
+          multiline: true
+    create_parents:
+      name: Create parent directories
+      required: false
+      default: true
+      selector:
+        boolean:
+
+supervisor_share_read:
+  name: "Supervisor — share read"
+  description: Read /share/<path>, return base64 (size-capped at 10MB).
+  fields:
+    path:
+      name: Path under /share
+      required: true
+      example: "/share/openwakeword/alfred.tflite"
+      selector:
+        text:
+
+supervisor_share_list:
+  name: "Supervisor — share list"
+  description: Directory listing under /share/.
+  fields:
+    path:
+      name: Path under /share
+      required: true
+      example: "/share/openwakeword"
+      selector:
+        text:
+
+supervisor_share_delete:
+  name: "Supervisor — share delete"
+  description: >
+    Delete a file under /share/. Directories are intentionally rejected
+    — use supervisor_call if you need recursive removal.
+  fields:
+    path:
+      name: Path under /share
+      required: true
+      example: "/share/openwakeword/alfred.tflite"
+      selector:
+        text:

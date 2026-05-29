@@ -56,13 +56,57 @@ class _Platform:
 _stub("homeassistant")
 _stub("homeassistant.config_entries", ConfigEntry=_Sentinel, ConfigFlow=_Sentinel, ConfigFlowResult=dict)
 _stub("homeassistant.const", Platform=_Platform, MATCH_ALL="*")
-_stub("homeassistant.core", HomeAssistant=_Sentinel)
+
+
+# `homeassistant.core` — stub the bits the Supervisor bridge touches.
+# `ServiceCall` carries `data`; `ServiceResponse` is just a typing alias
+# (dict); `SupportsResponse` is an enum-like sentinel.
+class _ServiceCall:
+    def __init__(self, data: dict | None = None):
+        self.data = data or {}
+
+
+class _SupportsResponse:
+    ONLY = "only"
+    OPTIONAL = "optional"
+    NONE = "none"
+
+
+_stub(
+    "homeassistant.core",
+    HomeAssistant=_Sentinel,
+    ServiceCall=_ServiceCall,
+    ServiceResponse=dict,
+    SupportsResponse=_SupportsResponse,
+)
 _stub("homeassistant.helpers")
 _stub(
     "homeassistant.helpers.aiohttp_client",
     async_get_clientsession=lambda hass: None,
 )
 _stub("homeassistant.helpers.entity_platform", AddEntitiesCallback=_Sentinel)
+
+
+# `homeassistant.helpers.config_validation` — stub a couple of the
+# voluptuous-adjacent helpers the services schema layer uses.
+def _cv_string(value):
+    if not isinstance(value, str):
+        raise ValueError("expected string")
+    return value
+
+
+def _cv_boolean(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ("true", "1", "yes", "on")
+    raise ValueError("expected boolean")
+
+
+_cv_stub = types.ModuleType("homeassistant.helpers.config_validation")
+_cv_stub.string = _cv_string
+_cv_stub.boolean = _cv_boolean
+sys.modules["homeassistant.helpers.config_validation"] = _cv_stub
 
 
 # `homeassistant.helpers.intent` — stub the IntentResponse + error codes.
