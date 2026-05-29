@@ -49,3 +49,6 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
+          # 'brands' is skipped until we register brand assets in
+          # home-assistant/brands (separate upstream PR; see issue #112 PR 5).
+          ignore: brands
