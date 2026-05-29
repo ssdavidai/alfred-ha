@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Alfred Black",
+        "description": "Point this Home Assistant at an Alfred tenant. Mint a channel token from `/study` (or `POST /api/v1/channel-tokens/mint` with channel `ha-conversation`) and paste it below.",
+        "data": {
+          "base_url": "Alfred tenant URL",
+          "channel_token": "Channel token"
+        },
+        "data_description": {
+          "base_url": "e.g. https://home.alfred.black",
+          "channel_token": "Starts with `ha_` followed by 48 hex characters."
+        }
+      }
+    },
+    "error": {
+      "invalid_url": "Base URL must be a full https://… or http://… address.",
+      "invalid_token_shape": "Channel token must start with `ha_` followed by 48 hex characters.",
+      "invalid_auth": "Alfred rejected the token. Mint a fresh one from /study and try again.",
+      "cannot_connect": "Could not reach Alfred at that URL. Check the host and your network (Tailscale, etc.)."
+    },
+    "abort": {
+      "already_configured": "This Alfred tenant is already connected to Home Assistant."
+    }
+  }
+}

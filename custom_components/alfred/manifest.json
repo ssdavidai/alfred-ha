@@ -1,0 +1,14 @@
+{
+  "domain": "alfred",
+  "name": "Alfred Black",
+  "codeowners": ["@ssdavidai"],
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "documentation": "https://github.com/ssdavidai/alfred-ha",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/ssdavidai/alfred/issues",
+  "requirements": ["aiohttp>=3.9.0"],
+  "version": "0.1.0",
+  "homeassistant": "2026.1.0"
+}
