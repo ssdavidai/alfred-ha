@@ -59,6 +59,7 @@ from .supervisor import (
     SupervisorClient,
     SupervisorUnavailable,
     safe_share_path,
+    supervisor_available,
     supervisor_token,
 )
 
