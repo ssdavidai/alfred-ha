@@ -9,7 +9,7 @@
           "channel_token": "Channel token"
         },
         "data_description": {
-          "base_url": "e.g. https://home.alfred.black",
+          "base_url": "Base URL of your Alfred deployment (https scheme expected)",
           "channel_token": "Starts with `ha_` followed by 48 hex characters."
         }
       }
