@@ -12,6 +12,10 @@ means the token is wrong; anything else is surfaced as `cannot_connect`.
 
 Pure helpers (URL normalisation, token shape check, preflight) live in
 `_validators.py` so they're unit-testable without an HA harness.
+
+An OptionsFlow exposes `CONF_TIMEOUT` so an operator can raise/lower the
+per-turn timeout without re-releasing the integration. Reachable from
+`Settings → Devices & Services → Alfred Black → Configure`.
 """
 
 from __future__ import annotations
@@ -22,11 +26,24 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from ._validators import _normalise_base_url, _preflight, _token_shape_ok
-from .const import CONF_BASE_URL, CONF_CHANNEL_TOKEN, DOMAIN
+from .const import (
+    CONF_BASE_URL,
+    CONF_CHANNEL_TOKEN,
+    CONF_TIMEOUT,
+    DEFAULT_TIMEOUT,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +59,18 @@ class AlfredConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Alfred Black."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> AlfredOptionsFlow:
+        """Return the options-flow handler for this integration.
+
+        HA invokes this when the user clicks **Configure** on the entry
+        card in `Settings → Devices & Services`.
+        """
+        return AlfredOptionsFlow(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -87,3 +116,41 @@ class AlfredConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
         )
+
+
+class AlfredOptionsFlow(OptionsFlow):
+    """Per-entry options for Alfred Black.
+
+    Today this exposes a single knob — `timeout` — so an operator can
+    raise the per-turn request cap for slow tool-using turns
+    (Composio gcal, vault search, paperclip) or lower it for fast
+    networks. Reachable from `Settings → Devices & Services → Alfred
+    Black → Configure`.
+
+    Held deliberately separate from `entry.data` so the schema can grow
+    (e.g. agent persona overrides, room enrichment toggles) without
+    triggering a config-flow migration.
+    """
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Stash the entry so we can read its current options on init."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Single-step options form: one positive-float `timeout` field."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current_timeout = float(
+            self.config_entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_TIMEOUT, default=current_timeout
+                ): cv.positive_float,
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)

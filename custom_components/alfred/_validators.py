@@ -81,9 +81,15 @@ def _extract_speech(envelope: Any) -> str:
 
 
 async def _preflight(
-    session: aiohttp.ClientSession, base_url: str, token: str
+    session: aiohttp.ClientSession,
+    base_url: str,
+    token: str,
+    timeout: float = DEFAULT_TIMEOUT,
 ) -> str | None:
     """Probe `{base_url}{API_PATH_TURN}` with a no-op turn.
+
+    `timeout` is the total round-trip cap in seconds. Defaults to
+    `DEFAULT_TIMEOUT`; the OptionsFlow can pass a tenant-specific value.
 
     Returns:
         None on success. An error key string (`invalid_auth`, `cannot_connect`,
@@ -103,7 +109,7 @@ async def _preflight(
             url,
             json=payload,
             headers=headers,
-            timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT),
+            timeout=aiohttp.ClientTimeout(total=timeout),
         ) as resp:
             if resp.status == 401:
                 return "invalid_auth"

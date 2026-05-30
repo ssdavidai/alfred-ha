@@ -35,6 +35,7 @@ from .const import (
     API_PATH_TURN,
     CONF_BASE_URL,
     CONF_CHANNEL_TOKEN,
+    CONF_TIMEOUT,
     DEFAULT_TIMEOUT,
     DOMAIN,
 )
@@ -120,13 +121,18 @@ class AlfredConversationEntity(ConversationEntity):
 
         url = f"{base_url}{API_PATH_TURN}"
         session = async_get_clientsession(self.hass)
+        # Per-entry override via OptionsFlow → entry.options[CONF_TIMEOUT].
+        # Falls back to DEFAULT_TIMEOUT (90s) when no override is set.
+        timeout_s = float(
+            self._entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+        )
 
         try:
             async with session.post(
                 url,
                 json=payload,
                 headers={"Authorization": f"Bearer {token}"},
-                timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT),
+                timeout=aiohttp.ClientTimeout(total=timeout_s),
             ) as resp:
                 if resp.status == 401:
                     return _error_result(

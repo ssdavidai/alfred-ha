@@ -17,6 +17,11 @@ from custom_components.alfred._validators import (
     _preflight,
     _token_shape_ok,
 )
+from custom_components.alfred.config_flow import AlfredOptionsFlow
+from custom_components.alfred.const import (
+    CONF_TIMEOUT,
+    DEFAULT_TIMEOUT,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -202,3 +207,84 @@ class TestPreflight:
             "agentId",
             "haInstallId",
         }
+
+    @pytest.mark.asyncio
+    async def test_default_timeout_is_default_const(self):
+        # Belt-and-braces guard: if DEFAULT_TIMEOUT is ever bumped in
+        # const.py, _preflight's default kwarg must move with it.
+        session = _make_session(200)
+        await _preflight(session, "https://home.alfred.black", "ha_" + "a" * 48)
+        ct = session.post.call_args.kwargs["timeout"]
+        # aiohttp.ClientTimeout exposes `.total` for the round-trip cap.
+        assert ct.total == DEFAULT_TIMEOUT
+
+    @pytest.mark.asyncio
+    async def test_explicit_timeout_kwarg_honoured(self):
+        # The OptionsFlow override path: caller passes `timeout=` and
+        # the ClientTimeout we build MUST carry that value, not the default.
+        session = _make_session(200)
+        await _preflight(
+            session,
+            "https://home.alfred.black",
+            "ha_" + "a" * 48,
+            timeout=7.5,
+        )
+        ct = session.post.call_args.kwargs["timeout"]
+        assert ct.total == 7.5
+        # Sanity: explicitly NOT the default.
+        assert ct.total != DEFAULT_TIMEOUT
+
+
+# ---------------------------------------------------------------------------
+# AlfredOptionsFlow — per-entry timeout override
+# ---------------------------------------------------------------------------
+
+
+class _FakeEntry:
+    """Minimal `ConfigEntry` stand-in carrying just `.options`."""
+
+    def __init__(self, options: dict | None = None):
+        self.options = options or {}
+
+
+class TestOptionsFlow:
+    @pytest.mark.asyncio
+    async def test_show_form_uses_default_when_no_override(self):
+        # Fresh entry, no options yet → form's `timeout` default is the
+        # current `DEFAULT_TIMEOUT` (90s as of v1.1.3).
+        flow = AlfredOptionsFlow(_FakeEntry())
+        result = await flow.async_step_init(user_input=None)
+        assert result["type"] == "form"
+        assert result["step_id"] == "init"
+
+        schema = result["data_schema"]
+        # voluptuous Schema.schema → dict of {Marker: validator};
+        # the default lives on the Marker.
+        markers = {str(k): k for k in schema.schema}
+        timeout_marker = markers[CONF_TIMEOUT]
+        assert timeout_marker.default() == DEFAULT_TIMEOUT
+
+    @pytest.mark.asyncio
+    async def test_show_form_uses_existing_override(self):
+        # Entry already has a stored override → that becomes the new default.
+        flow = AlfredOptionsFlow(_FakeEntry({CONF_TIMEOUT: 45.0}))
+        result = await flow.async_step_init(user_input=None)
+        schema = result["data_schema"]
+        markers = {str(k): k for k in schema.schema}
+        assert markers[CONF_TIMEOUT].default() == 45.0
+
+    @pytest.mark.asyncio
+    async def test_submit_creates_entry_with_user_value(self):
+        # Happy path: user enters 120s, options-flow persists it.
+        flow = AlfredOptionsFlow(_FakeEntry())
+        result = await flow.async_step_init(user_input={CONF_TIMEOUT: 120.0})
+        assert result["type"] == "create_entry"
+        assert result["data"] == {CONF_TIMEOUT: 120.0}
+
+    @pytest.mark.asyncio
+    async def test_submit_round_trips_value_unchanged(self):
+        # 30 (low end) round-trips as-is — the OptionsFlow doesn't coerce
+        # or clamp here; cv.positive_float in the schema is the only gate.
+        flow = AlfredOptionsFlow(_FakeEntry({CONF_TIMEOUT: 90.0}))
+        result = await flow.async_step_init(user_input={CONF_TIMEOUT: 30.0})
+        assert result["data"] == {CONF_TIMEOUT: 30.0}

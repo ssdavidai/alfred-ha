@@ -23,5 +23,19 @@
     "abort": {
       "already_configured": "This Alfred tenant is already connected to Home Assistant."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Alfred Black options",
+        "description": "Tune per-turn behaviour for this Alfred tenant.",
+        "data": {
+          "timeout": "Per-turn timeout (seconds)"
+        },
+        "data_description": {
+          "timeout": "How long to wait for a single conversation turn before giving up. Tool-using turns (calendar, vault search, integrations chained through Composio) routinely take 25-45s on a cold path; the 90s default leaves slack. Lower for fast networks; raise for slow ones."
+        }
+      }
+    }
   }
 }
