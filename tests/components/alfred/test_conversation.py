@@ -18,6 +18,7 @@ import aiohttp
 import pytest
 
 from custom_components.alfred._validators import _extract_speech
+from custom_components.alfred.const import CONF_TIMEOUT, DEFAULT_TIMEOUT
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +243,39 @@ class TestTurnHTTP:
         )
         headers = session.post.call_args.kwargs["headers"]
         assert headers["Authorization"] == "Bearer ha_secret"
+
+
+# ---------------------------------------------------------------------------
+# Per-entry timeout override — mirrors the conversation entity's read of
+# `entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)`.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_timeout(entry_options: dict) -> float:
+    """Replicate conversation.py's per-turn timeout resolution.
+
+    Kept in a tiny helper so the test stays decoupled from the HA
+    `ConversationEntity` subclass (which still can't be instantiated
+    without a running HA core).
+    """
+    return float(entry_options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
+
+class TestTimeoutResolution:
+    def test_no_override_uses_default(self):
+        assert _resolve_timeout({}) == DEFAULT_TIMEOUT
+
+    def test_override_wins(self):
+        assert _resolve_timeout({CONF_TIMEOUT: 120.0}) == 120.0
+
+    def test_override_coerced_from_int(self):
+        # cv.positive_float persists as float on submit, but defensive
+        # casting in conversation.py means an int from a legacy entry
+        # still works.
+        assert _resolve_timeout({CONF_TIMEOUT: 45}) == 45.0
+
+    def test_default_is_90_seconds_post_v113(self):
+        # Lock the v1.1.3 bump in place — if a future commit lowers it
+        # without also touching the rationale in const.py, this test
+        # forces a conscious decision.
+        assert DEFAULT_TIMEOUT == 90.0

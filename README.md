@@ -14,6 +14,7 @@ This integration is part of the plan in [`ssdavidai/alfred#111`](https://github.
 | Non-streaming conversation turn → Alfred | shipping in v0.1 | this repo (PR #1) |
 | **Supervisor bridge (LLAT → Supervisor REST)** | **shipping in v1.1** | this repo (PR #2) |
 | Resilient config_flow preflight (30s timeout, server short-circuit) | shipping in v1.1.2 | this repo + ctrl-api short-circuit in `ssdavidai/alfred` |
+| 90s default timeout for tool-using turns + per-entry override | shipping in v1.1.3 | this repo |
 | HA tool partitioning (`HassTurnOn`, `HassClimate`, …) | not yet | `ssdavidai/alfred#111` PR3 |
 | Curated MCP catalog per HA turn | not yet | `ssdavidai/alfred#111` PR4 |
 | Voice-context primer + room enrichment | not yet | `ssdavidai/alfred#111` PR5 |
@@ -46,6 +47,12 @@ Then in Home Assistant:
 4. Hit **Submit**. The integration runs a preflight against `/api/v1/channels/ha/turn`; you'll see an inline error if either field is wrong.
 
 Finally, set Alfred as your conversation agent on **Settings → Voice assistants → Assist → Conversation agent**.
+
+### Per-entry options (Configure)
+
+After pairing, the Alfred entry card on **Settings → Devices & Services → Alfred Black** exposes a **Configure** button. Today it carries one knob:
+
+- **Per-turn timeout (seconds)** — how long to wait for a single conversation turn before giving up. Defaults to **90s** in v1.1.3+ so tool-using turns (calendar lookups, vault search, integrations chained through Composio) don't surface a false `Alfred timed out.` on a cold path. Lower it on fast networks (e.g. 30s) if you want quicker failure; raise it on slow ones.
 
 ## Architecture (one-paragraph)
 

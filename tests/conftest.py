@@ -54,7 +54,26 @@ class _Platform:
 
 
 _stub("homeassistant")
-_stub("homeassistant.config_entries", ConfigEntry=_Sentinel, ConfigFlow=_Sentinel, ConfigFlowResult=dict)
+
+
+class _OptionsFlow:
+    """Stand-in for HA's OptionsFlow that supports show_form / create_entry."""
+
+    def async_show_form(self, **kwargs):
+        # Mirrors HA's signature — returns a flow-result-shaped dict.
+        return {"type": "form", **kwargs}
+
+    def async_create_entry(self, **kwargs):
+        return {"type": "create_entry", **kwargs}
+
+
+_stub(
+    "homeassistant.config_entries",
+    ConfigEntry=_Sentinel,
+    ConfigFlow=_Sentinel,
+    ConfigFlowResult=dict,
+    OptionsFlow=_OptionsFlow,
+)
 _stub("homeassistant.const", Platform=_Platform, MATCH_ALL="*")
 
 
@@ -72,12 +91,18 @@ class _SupportsResponse:
     NONE = "none"
 
 
+def _callback(func):
+    """Stand-in for `@homeassistant.core.callback` — pass-through decorator."""
+    return func
+
+
 _stub(
     "homeassistant.core",
     HomeAssistant=_Sentinel,
     ServiceCall=_ServiceCall,
     ServiceResponse=dict,
     SupportsResponse=_SupportsResponse,
+    callback=_callback,
 )
 _stub("homeassistant.helpers")
 _stub(
@@ -103,9 +128,17 @@ def _cv_boolean(value):
     raise ValueError("expected boolean")
 
 
+def _cv_positive_float(value):
+    f = float(value)
+    if f <= 0:
+        raise ValueError("must be positive")
+    return f
+
+
 _cv_stub = types.ModuleType("homeassistant.helpers.config_validation")
 _cv_stub.string = _cv_string
 _cv_stub.boolean = _cv_boolean
+_cv_stub.positive_float = _cv_positive_float
 sys.modules["homeassistant.helpers.config_validation"] = _cv_stub
 
 

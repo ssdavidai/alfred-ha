@@ -16,6 +16,11 @@ Plug **Alfred Black** in as Home Assistant's conversation agent. Once configured
 
 - Generous 30s default request timeout so a cold Hermes turn doesn't surface a false `cannot_connect`. Pairs with a server-side preflight short-circuit in `ssdavidai/alfred` so config_flow itself never waits on Hermes.
 
+## What v1.1.3 adds
+
+- Default per-turn timeout bumped 30s → **90s** for tool-using turns (calendar lookups, vault search, Composio integrations chained from Hermes). Sir's first real Assist test ("What's on my calendar tomorrow?") timed out at 31s mid-gcal tool-call on v1.1.2; 90s leaves headroom for the cold-path.
+- New **OptionsFlow** — open `Settings → Devices & Services → Alfred Black → Configure` to raise or lower the per-turn timeout without re-releasing the integration.
+
 ## What is deferred
 
 - **HA tool partitioning** (`HassTurnOn`, `HassClimate`, etc. translated to Hermes tools) — issue #111 PR3.
