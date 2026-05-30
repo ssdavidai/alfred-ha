@@ -19,6 +19,14 @@ API_PATH_TURN: Final = "/api/v1/channels/ha/turn"
 # Default timeout for one /turn round-trip (seconds). Hermes-main answers
 # in 1–3s typically; 30s covers slow vault searches and the occasional
 # cold-start. PR6 will lower this once streaming is in place.
+#
+# Belt-and-braces with the ctrl-api preflight short-circuit
+# (ssdavidai/alfred — fix(ctrl): /channels/ha/turn — short-circuit
+# alfred-ha preflight): the server now replies in <100ms for the
+# preflight magic text, so config_flow never waits on Hermes. But a
+# generous timeout still protects every OTHER turn — e.g. if Hermes is
+# mid-restart, a real /turn from HA Assist should wait rather than
+# surface `cannot_connect` to the operator.
 DEFAULT_TIMEOUT: Final = 30.0
 
 # Bearer-token shape: tokens minted via /api/v1/channel-tokens/mint with
