@@ -13,6 +13,7 @@ This integration is part of the plan in [`ssdavidai/alfred#111`](https://github.
 | HACS-installable skeleton | shipping in v0.1 | this repo (PR #1) |
 | Non-streaming conversation turn → Alfred | shipping in v0.1 | this repo (PR #1) |
 | **Supervisor bridge (LLAT → Supervisor REST)** | **shipping in v1.1** | this repo (PR #2) |
+| Resilient config_flow preflight (30s timeout, server short-circuit) | shipping in v1.1.2 | this repo + ctrl-api short-circuit in `ssdavidai/alfred` |
 | HA tool partitioning (`HassTurnOn`, `HassClimate`, …) | not yet | `ssdavidai/alfred#111` PR3 |
 | Curated MCP catalog per HA turn | not yet | `ssdavidai/alfred#111` PR4 |
 | Voice-context primer + room enrichment | not yet | `ssdavidai/alfred#111` PR5 |

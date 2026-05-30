@@ -12,6 +12,10 @@ Plug **Alfred Black** in as Home Assistant's conversation agent. Once configured
 
 - A set of `alfred.supervisor_*` HA services that forward to Supervisor REST using HA's auto-injected `SUPERVISOR_TOKEN`. This gives any LLAT-bearing caller Supervisor scope — addon configs, host info, OS info, and `/share/` reads/writes — without needing SSH or per-addon credentials. **Unblocks wake-word model uploads in one HTTP call.** See the README's "Supervisor bridge" section for the full surface + examples.
 
+## What v1.1.2 adds
+
+- Generous 30s default request timeout so a cold Hermes turn doesn't surface a false `cannot_connect`. Pairs with a server-side preflight short-circuit in `ssdavidai/alfred` so config_flow itself never waits on Hermes.
+
 ## What is deferred
 
 - **HA tool partitioning** (`HassTurnOn`, `HassClimate`, etc. translated to Hermes tools) — issue #111 PR3.
